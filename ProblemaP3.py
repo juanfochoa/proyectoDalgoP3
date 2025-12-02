@@ -30,8 +30,6 @@ def solve():
         verticales = []
 
         # Para cada foco (x, y) creamos:
-        # - una horizontal: (2x - 1, 2y) -> (2x + 1, 2y)
-        # - una vertical:   (2x, 2y - 1) -> (2x, 2y + 1)
         for (x, y) in points:
             X = 2 * x
             Y = 2 * y
