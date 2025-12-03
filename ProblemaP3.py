@@ -1,140 +1,167 @@
-# ProblemaP3.py
-# Autores:
-#   Juan Felipe Hortúa
-#   Juan Felipe Ochoa
+# Autores: Juan Felipe Ochoa, Juan Felipe Hortúa 
+# ISIS 1105 - Proyecto Parte 3
+# Problema de cobertura mínima de focos de infección
+# Solución usando algoritmo de aproximación para Vertex Cover
 
 import sys
 
-def solve():
-    data = sys.stdin.read().strip().split()
-    if not data:
-        return
+def aproximacion_por_aristas(focos):
+    """
+    Aproximación 2-aproximado: por cada foco sin cubrir,
+    agrega ambas líneas que lo cubren.
+    """
+    if not focos:
+        return set(), set()
+    
+    lineas_x = set()
+    lineas_y = set()
+    
+    focos_cubiertos = set()
+    
+    for x, y in sorted(focos):
+        if (x, y) in focos_cubiertos:
+            continue
+        
+        lineas_x.add(x)
+        lineas_y.add(y)
+        
+        for fx, fy in focos:
+            if fx == x or fy == y:
+                focos_cubiertos.add((fx, fy))
+    
+    return lineas_x, lineas_y
 
-    t = int(data[0])
-    idx = 1
-    out_lines = []
 
-    for _ in range(t):
-        n = int(data[idx])
-        idx += 1
-
-        focos = []
-        for _ in range(n):
-            x = int(data[idx])
-            y = int(data[idx + 1])
-            idx += 2
-            focos.append((x, y))
-
-        # Obtener coordenadas únicas
-        x_coords = sorted(set(x for x, y in focos))
-        y_coords = sorted(set(y for x, y in focos))
+def remover_lineas_innecesarias(focos, lineas_x, lineas_y):
+    """
+    Elimina líneas redundantes que no son necesarias
+    porque sus focos ya están cubiertos por otras líneas.
+    """
+    lineas_x = set(lineas_x)
+    lineas_y = set(lineas_y)
+    
+    cambio = True
+    while cambio:
+        cambio = False
         
-        # Crear grafo bipartito
-        # Cada foco (x,y) crea una arista entre coordenada-x y coordenada-y
-        grafo_x = {}
-        for x in x_coords:
-            grafo_x[x] = []
-        
-        for x, y in focos:
-            if y not in grafo_x[x]:
-                grafo_x[x].append(y)
-        
-        # Matching usando DFS
-        pareja_y = {}
-        for y in y_coords:
-            pareja_y[y] = None
-        
-        def dfs(x, visitado):
-            for y in grafo_x[x]:
-                if y in visitado:
-                    continue
-                visitado.add(y)
-                if pareja_y[y] is None or dfs(pareja_y[y], visitado):
-                    pareja_y[y] = x
-                    return True
-            return False
-        
-        # Encontrar matching máximo
-        for x in x_coords:
-            visitado = set()
-            dfs(x, visitado)
-        
-        # Crear pareja_x inversa
-        pareja_x = {}
-        for x in x_coords:
-            pareja_x[x] = None
-        for y, x in pareja_y.items():
-            if x is not None:
-                pareja_x[x] = y
-        
-        # König: encontrar vertex cover mínimo
-        visitado_x = set()
-        visitado_y = set()
-        
-        # BFS desde X no emparejados
-        cola = []
-        for x in x_coords:
-            if pareja_x[x] is None:
-                cola.append(('x', x))
-                visitado_x.add(x)
-        
-        idx_cola = 0
-        while idx_cola < len(cola):
-            tipo, nodo = cola[idx_cola]
-            idx_cola += 1
+        for y in list(lineas_y):
+            focos_en_y = [(x, cy) for x, cy in focos if cy == y]
+            todos_cubiertos = all(x in lineas_x for x, cy in focos_en_y)
             
-            if tipo == 'x':
-                for y in grafo_x[nodo]:
-                    if y not in visitado_y and pareja_y[y] != nodo:
-                        visitado_y.add(y)
-                        cola.append(('y', y))
-            else:
-                x = pareja_y[nodo]
-                if x is not None and x not in visitado_x:
-                    visitado_x.add(x)
-                    cola.append(('x', x))
+            if todos_cubiertos:
+                lineas_y.remove(y)
+                cambio = True
+                break
         
-        # Cover: X no visitados + Y visitados
-        cover_x = [x for x in x_coords if x not in visitado_x]
-        cover_y = [y for y in y_coords if y in visitado_y]
-        
-        # Construir horizontales (para cada Y en cover)
-        horizontales = []
-        for y in sorted(cover_y):
-            x_list = [x for x, yy in focos if yy == y]
-            min_x = min(x_list)
-            max_x = max(x_list)
-            horizontales.append((min_x, y, max_x, y))
-        
-        # Construir verticales (para cada X en cover)
-        verticales = []
-        for x in sorted(cover_x):
-            y_list = [y for xx, y in focos if xx == x]
-            min_y = min(y_list)
-            max_y = max(y_list)
-            verticales.append((x, min_y, x, max_y))
-        
-        out_lines.append(formatear_linea(horizontales))
-        out_lines.append(formatear_linea(verticales))
-
-    for line in out_lines:
-        print(line)
-
-
-def formatear_linea(trayectorias):
-    if len(trayectorias) == 0:
-        return "0"
+        for x in list(lineas_x):
+            focos_en_x = [(cx, y) for cx, y in focos if cx == x]
+            todos_cubiertos = all(y in lineas_y for cx, y in focos_en_x)
+            
+            if todos_cubiertos:
+                lineas_x.remove(x)
+                cambio = True
+                break
     
-    partes = [str(len(trayectorias))]
-    for x1, y1, x2, y2 in trayectorias:
-        partes.append(str(x1))
-        partes.append(str(y1))
-        partes.append(str(x2))
-        partes.append(str(y2))
+    return lineas_x, lineas_y
+
+
+def elegir_mejor_linea(focos):
+    """
+    Algoritmo greedy: siempre elige la línea que cubre
+    más focos sin cubrir.
+    """
+    focos_restantes = set(focos)
+    lineas_x_usadas = set()
+    lineas_y_usadas = set()
     
-    return " ".join(partes)
+    while focos_restantes:
+        mejor_linea = None
+        mejor_tipo = None
+        maxima_cobertura = 0
+
+        ys_posibles = set(y for x, y in focos_restantes)
+        for y in ys_posibles:
+            cobertura = sum(1 for x, cy in focos_restantes if cy == y)
+            if cobertura > maxima_cobertura:
+                maxima_cobertura = cobertura
+                mejor_linea = y
+                mejor_tipo = 'H'
+        
+        xs_posibles = set(x for x, y in focos_restantes)
+        for x in xs_posibles:
+            cobertura = sum(1 for cx, y in focos_restantes if cx == x)
+            if cobertura > maxima_cobertura:
+                maxima_cobertura = cobertura
+                mejor_linea = x
+                mejor_tipo = 'V'
+        
+        if mejor_tipo == 'H':
+            lineas_y_usadas.add(mejor_linea)
+            focos_restantes = {(x, y) for x, y in focos_restantes if y != mejor_linea}
+        else:  # 'V'
+            lineas_x_usadas.add(mejor_linea)
+            focos_restantes = {(x, y) for x, y in focos_restantes if x != mejor_linea}
+    
+    return lineas_x_usadas, lineas_y_usadas
+
+
+def resolver_cobertura(focos):
+    if not focos:
+        return [], []
+    
+    x1, y1 = aproximacion_por_aristas(focos)
+    x1, y1 = remover_lineas_innecesarias(focos, x1, y1)
+
+    x2, y2 = elegir_mejor_linea(focos)
+    x2, y2 = remover_lineas_innecesarias(focos, x2, y2)
+    
+    if len(x1) + len(y1) <= len(x2) + len(y2):
+        lineas_x, lineas_y = x1, y1
+    else:
+        lineas_x, lineas_y = x2, y2
+    
+    lineas_horizontales = []
+    for y in sorted(lineas_y):
+        xs = [x for x, cy in focos if cy == y]
+        lineas_horizontales.append((y, min(xs), max(xs)))
+    
+    lineas_verticales = []
+    for x in sorted(lineas_x):
+        ys = [y for cx, y in focos if cx == x]
+        lineas_verticales.append((x, min(ys), max(ys)))
+    
+    return lineas_horizontales, lineas_verticales
+
+
+def main():
+    # Para pruebas locales: descomenta la siguiente línea
+    #sys.stdin = open('input.txt', 'r')
+    
+    entrada = sys.stdin.read().strip().split('\n')
+    num_casos = int(entrada[0])
+    
+    for i in range(1, num_casos + 1):
+        datos = list(map(int, entrada[i].split()))
+        n = datos[0]
+        
+        focos = []
+        for j in range(n):
+            x = datos[1 + j * 2]
+            y = datos[1 + j * 2 + 1]
+            focos.append((x, y))
+        
+        horizontales, verticales = resolver_cobertura(focos)
+        
+        print(len(horizontales), end='')
+        for y, x_min, x_max in horizontales:
+            print(f" {x_min} {y} {x_max} {y}", end='')
+        print()
+
+        print(len(verticales), end='')
+        for x, y_min, y_max in verticales:
+            print(f" {x} {y_min} {x} {y_max}", end='')
+        print()
 
 
 if __name__ == "__main__":
-    sys.stdin = open('input.txt', 'r')
-    solve()
+    main()
